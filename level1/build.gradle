@@ -1,0 +1,47 @@
+plugins {
+  id 'ivy-publish'
+}
+
+def user = System.getProperty("user.name")
+group = "org.${user}"
+version = "1.0.0"
+
+publishing {
+    repositories {
+        ivy {
+            url "/tmp/${user}/gradle-ivy-repo"
+
+            // With Ivy, getting both the artifact and the ivy patterns was critical
+            // so do it with Gradle as well
+            layout "pattern", {
+                artifact "[organisation]/[module]/[revision]/[artifact]-[revision]-[type].[ext]"
+                ivy "[organisation]/[module]/[revision]/ivy.xml"
+                m2compatible = true
+            }
+        }
+    }
+    publications {
+        ivy(IvyPublication) {
+            artifact('src/level1-bit1.8.bit') {
+                 type "bit1.8"
+                 extension "bit"
+                 name "level1"
+            }
+            artifact('src/level1-source.txt') {
+                 type "source"
+                 extension "txt"
+                 name "level1"
+            }
+            artifact('src/level1-zac3.1.zac') {
+                 type "zac3.1"
+                 extension "zac"
+                 name "level1"
+            }
+
+            // Remove configurations
+            descriptor.withXml {
+                asNode().dependencies.dependency.findAll {it.@conf}.each {it.attributes.remove("conf")}
+            }
+        }
+    }
+}

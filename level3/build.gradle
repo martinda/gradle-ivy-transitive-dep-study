@@ -1,0 +1,67 @@
+plugins {
+  id 'ivy-publish'
+}
+
+def user = System.getProperty("user.name")
+group = "org.${user}"
+version = "3.2.1"
+
+repositories {
+    ivy {
+        url "/tmp/${user}/gradle-ivy-repo"
+
+        // With Ivy, getting both the artifact and the ivy patterns was critical
+        // so do it with Gradle as well
+        layout "pattern", {
+            artifact "[organisation]/[module]/[revision]/[artifact]-[revision]-[type].[ext]"
+            ivy "[organisation]/[module]/[revision]/ivy.xml"
+            m2compatible = true
+        }
+    }
+}
+
+configurations {
+    compile
+}
+
+dependencies {
+    compile("org.${user}:module2:2.1.0") {
+
+        // Since we want non-jar dependencies, we must be explicit
+        // with the DependencyHandler
+        artifact {
+            name = "level2"
+            extension = "bit"
+            type = "bit1.8"
+        }
+        artifact {
+            name = "level2"
+            extension = "zac"
+            type = "zac3.1"
+        }
+    }
+}
+
+task copyDeps(type: Copy) {
+    inputs.files configurations.compile
+    into "${buildDir}/layout"
+    from configurations.compile
+}
+
+task resolveIvyDescriptorFiles {
+    doLast {
+        def componentIds = configurations.compile.incoming.resolutionResult.allDependencies.collect { it.selected.id }
+
+        def result = dependencies.createArtifactResolutionQuery()
+            .forComponents(componentIds)
+            .withArtifacts(IvyModule, IvyDescriptorArtifact)
+            .execute()
+
+        for (component in result.resolvedComponents) {
+            component.getArtifacts(IvyDescriptorArtifact).each {
+                //assert it.file.name == 'ivy.xml'
+                println("Component: "+component+", "+it.file.absolutePath)
+            }
+        }
+    }
+}

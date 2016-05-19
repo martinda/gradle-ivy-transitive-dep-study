@@ -1,0 +1,122 @@
+plugins {
+  id 'ivy-publish'
+}
+
+def user = System.getProperty("user.name")
+group = "org.${user}"
+version = "2.1.0"
+
+repositories {
+    ivy {
+        url "/tmp/${user}/gradle-ivy-repo"
+
+        layout "pattern", {
+            artifact "[organisation]/[module]/[revision]/[artifact]-[revision]-[type].[ext]"
+            ivy "[organisation]/[module]/[revision]/ivy.xml"
+            m2compatible = true
+        }
+    }
+}
+
+configurations {
+   compile
+}
+
+dependencies {
+    compile(group: "org.${user}", name: "module1", version: "1.0.0") {
+        // Since we want non-jar dependencies, we must be explicit
+        // with the DependencyHandler
+        artifact {
+            name = "level1"
+            extension = "bit"
+            type = "bit1.8"
+        }
+        artifact {
+            name = "level1"
+            extension = "zac"
+            type = "zac3.1"
+        }
+        artifact {
+            name = "level1"
+            extension = "txt"
+            type = "source"
+        }
+    }
+}
+
+publishing {
+    repositories {
+        ivy {
+            url "/tmp/${user}/gradle-ivy-repo"
+
+            layout "pattern", {
+                artifact "[organisation]/[module]/[revision]/[artifact]-[revision]-[type].[ext]"
+                ivy "[organisation]/[module]/[revision]/ivy.xml"
+                m2compatible = true
+            }
+        }
+    }
+
+    publications {
+        ivy(IvyPublication) {
+            artifact('src/level2-bit1.8.bit') {
+                 type "bit1.8"
+                 extension "bit"
+                 name "level2"
+            }
+            artifact('src/level2-source.txt') {
+                 type "source"
+                 extension "txt"
+                 name "level2"
+            }
+            artifact('src/level2-zac3.1.zac') {
+                 type "zac3.1"
+                 extension "zac"
+                 name "level2"
+            }
+
+            // Add dependencies to ivy descriptor
+            descriptor.withXml {
+                project.configurations.compile.resolvedConfiguration.firstLevelModuleDependencies.each { ResolvedDependency dep ->
+                  def Map dependencyDetails = new HashMap<>()
+                  dependencyDetails.put('org',  dep.getModuleGroup())
+                  dependencyDetails.put('name', dep.getModuleName())
+                  dependencyDetails.put('rev',  dep.getModuleVersion())
+                  def dependency = asNode().dependencies[0].appendNode('dependency', dependencyDetails)
+                  dep.moduleArtifacts.each { art ->
+                      def artDetail = new HashMap<>()
+                      artDetail.put('name', art.name)
+                      artDetail.put('type', art.type)
+                      artDetail.put('ext', art.extension)
+                      dependency.appendNode('artifact', artDetail)
+                  }
+                }
+                asNode().configurations.conf.each {it.parent().remote(it)}
+                asNode().dependencies.dependency.findAll {it.@conf}.each {it.attributes.remove("conf")}
+            }
+        }
+    }
+}
+
+task copyDeps(type: Copy) {
+    inputs.files configurations.compile
+    into "${buildDir}/layout"
+    from configurations.compile
+}
+
+task resolveIvyDescriptorFiles {
+    doLast {
+        def componentIds = configurations.compile.incoming.resolutionResult.allDependencies.collect { it.selected.id }
+
+        def result = dependencies.createArtifactResolutionQuery()
+            .forComponents(componentIds)
+            .withArtifacts(IvyModule, IvyDescriptorArtifact)
+            .execute()
+
+        for (component in result.resolvedComponents) {
+            component.getArtifacts(IvyDescriptorArtifact).each {
+                println("Component: "+component+", "+it.file.class)
+            }
+        }
+    }
+}
