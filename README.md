@@ -46,7 +46,7 @@ gradle copyDeps
 Now examine what files were copied to the `level3/build/` folder:
 
 ```
-$ tree
+$ tree build
 build
 `-- layout
     |-- level1-1.0.0-bit1.8.bit
